@@ -5,6 +5,7 @@ export * from './torbox.js';
 export * from './nzbdav.js';
 export * from './altmount.js';
 export * from './aiostreams.js';
+export * from './vps.js';
 
 import {
   appConfig,
@@ -22,6 +23,7 @@ import { AltmountService } from './altmount.js';
 import { StremioNNTPService } from './stremio-nntp.js';
 import { EasynewsService } from './easynews.js';
 import { NativeUsenetService } from './aiostreams.js';
+import { VpsDebridService } from './vps.js';
 
 export function getDebridService(
   serviceName: ServiceId,
@@ -62,6 +64,11 @@ export function getDebridService(
       }
       return new TorboxDebridService(config, {
         pollInterval,
+        maxWaitTime,
+      });
+    case 'vps':
+      return new VpsDebridService(config, {
+        pollingInterval: pollInterval,
         maxWaitTime,
       });
     case 'nzbdav':
