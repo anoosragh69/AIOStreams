@@ -386,7 +386,9 @@ export class VpsDebridService implements TorrentDebridService {
       });
     }
 
-    const requestedIndex = playbackInfo.fileIndex ?? playbackInfo.index;
+    // `index` identifies the source stream in AIOStreams; it is not the
+    // selected file index. Only use the explicit fileIndex for VPS files.
+    const requestedIndex = playbackInfo.fileIndex;
     const selected =
       requestedIndex !== undefined
         ? filesResponse.files[requestedIndex]
