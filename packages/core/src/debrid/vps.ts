@@ -78,8 +78,18 @@ export class VpsDebridService implements TorrentDebridService {
 
   private parseCredentials(token: string): VpsCredential {
     try {
-      const decoded = fromUrlSafeBase64(token);
-      const parsed = JSON.parse(decoded) as Partial<VpsCredential>;
+      let parsed: Partial<VpsCredential>;
+
+      // Service Wrap serializes multi-field credentials as JSON. Accept that
+      // format first, then support URL-safe base64 JSON for manually supplied
+      // credentials and compatibility with other service integrations.
+      try {
+        parsed = JSON.parse(token) as Partial<VpsCredential>;
+      } catch {
+        parsed = JSON.parse(
+          fromUrlSafeBase64(token)
+        ) as Partial<VpsCredential>;
+      }
 
       if (!parsed.url || !parsed.apiKey) {
         throw new Error('Missing VPS URL or API key');
