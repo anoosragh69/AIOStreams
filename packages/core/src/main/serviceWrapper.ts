@@ -632,6 +632,11 @@ export function getServiceCredential(service: {
         email: creds.email,
         password: creds.password,
       });
+    case constants.VPS_SERVICE:
+      return JSON.stringify({
+        url: creds.url,
+        apiKey: creds.apiKey,
+      });
     default:
       return creds.apiKey;
   }
