@@ -1,5 +1,6 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import { fetch, type RequestInit } from 'undici';
+import parseTorrent from 'parse-torrent';
 import {
   DebridError,
   type DebridDownload,
@@ -253,17 +254,70 @@ export class VpsDebridService implements TorrentDebridService {
     return this.toDebridDownload(response.download);
   }
 
-  async addTorrent(_torrent: string): Promise<DebridDownload> {
-    throw new DebridError(
-      'VPS torrent-file submission is not implemented yet',
-      {
-        statusCode: 501,
-        statusText: 'Not Implemented',
-        code: 'NOT_IMPLEMENTED',
+  async addTorrent(torrentUrl: string): Promise<DebridDownload> {
+    let torrentBuffer: Buffer;
+    try {
+      const response = await fetch(torrentUrl, {
+        headers: { Accept: 'application/x-bittorrent' },
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch torrent file: HTTP ${response.status}`);
+      }
+      torrentBuffer = Buffer.from(await response.arrayBuffer());
+    } catch (error) {
+      throw new DebridError(
+        `Failed to download torrent file: ${error instanceof Error ? error.message : String(error)}`,
+        {
+          statusCode: 502,
+          statusText: 'Bad Gateway',
+          code: 'BAD_GATEWAY',
+          headers: {},
+          body: null,
+          cause: error,
+        }
+      );
+    }
+
+    let parsedTorrent: parseTorrent.Instance;
+    try {
+      parsedTorrent = parseTorrent(torrentBuffer) as parseTorrent.Instance;
+    } catch (error) {
+      throw new DebridError(
+        `Failed to parse torrent file: ${error instanceof Error ? error.message : String(error)}`,
+        {
+          statusCode: 400,
+          statusText: 'Bad Request',
+          code: 'BAD_REQUEST',
+          headers: {},
+          body: null,
+          cause: error,
+        }
+      );
+    }
+
+    const infohash = parsedTorrent.infoHash;
+    if (!infohash) {
+      throw new DebridError('Torrent file does not contain an infohash', {
+        statusCode: 400,
+        statusText: 'Bad Request',
+        code: 'BAD_REQUEST',
         headers: {},
         body: null,
+      });
+    }
+
+    const response = await this.request<VpsDownloadResponse>(
+      '/api/v1/torrents',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ source: torrentUrl, infohash }),
       }
     );
+
+    return this.toDebridDownload(response.download);
   }
 
   async getMagnet(
