@@ -241,7 +241,7 @@ export class VpsDebridService implements TorrentDebridService {
     );
   }
 
-  async addMagnet(magnet: string): Promise<DebridDownload> {
+  async addMagnet(magnet: string, requestedFileName?: string): Promise<DebridDownload> {
     const response = await this.request<VpsDownloadResponse>(
       '/api/v1/magnets',
       {
@@ -249,7 +249,7 @@ export class VpsDebridService implements TorrentDebridService {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ magnet }),
+        body: JSON.stringify({ magnet, requestedFileName }),
       }
     );
 
@@ -258,7 +258,7 @@ export class VpsDebridService implements TorrentDebridService {
     return download;
   }
 
-  async addTorrent(torrentUrl: string): Promise<DebridDownload> {
+  async addTorrent(torrentUrl: string, requestedFileName?: string): Promise<DebridDownload> {
     let torrentBuffer: Buffer;
     try {
       const response = await fetch(torrentUrl, {
@@ -317,7 +317,7 @@ export class VpsDebridService implements TorrentDebridService {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ source: torrentUrl, infohash }),
+        body: JSON.stringify({ source: torrentUrl, infohash, requestedFileName }),
       }
     );
 
@@ -375,7 +375,7 @@ export class VpsDebridService implements TorrentDebridService {
     let download: DebridDownload;
 
     if (useTorrentFile && playbackInfo.downloadUrl) {
-      download = await this.addTorrent(playbackInfo.downloadUrl);
+      download = await this.addTorrent(playbackInfo.downloadUrl, filename);
     } else {
       let magnet = `magnet:?xt=urn:btih:${playbackInfo.hash}`;
 
@@ -387,7 +387,7 @@ export class VpsDebridService implements TorrentDebridService {
         magnet += `&tr=${encodeURIComponent(source)}`;
       }
 
-      download = await this.addMagnet(magnet);
+      download = await this.addMagnet(magnet, filename);
     }
 
     // If the download already existed (deduplicated by infohash), don't set up failover cleanup
