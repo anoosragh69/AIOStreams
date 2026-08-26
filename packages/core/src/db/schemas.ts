@@ -525,6 +525,14 @@ export const UserDataSchema = z.object({
   encryptedPassword: z.string().min(1).optional(),
   trusted: z.boolean().optional(),
   showChanges: z.boolean().optional(),
+  /** How often the manifest change notice appears after a save. */
+  manifestNotice: z.enum(['always', 'significant', 'never']).optional(),
+  /** Preferences only. The credentials themselves live in `linked_accounts`. */
+  linkedAccounts: z
+    .object({
+      pushBehaviour: z.enum(['ask', 'auto', 'never']).optional(),
+    })
+    .optional(),
   accessKey: z.string().optional(),
   ip: z.string().optional(),
   addonName: z.string().min(1).max(300).optional(),
@@ -733,6 +741,9 @@ export const UserDataSchema = z.object({
         )
         .optional(),
       behaviour: z.enum(['sequential', 'parallel']).optional(),
+      onConditionFailure: z
+        .enum(['stop', 'skip', 'includeFinished'])
+        .optional(),
     })
     .optional(),
   sortCriteria: z.object({
@@ -1087,6 +1098,7 @@ export const ParsedFileSchema = z.object({
   audioChannels: z.array(z.string()),
   visualTags: z.array(z.string()),
   audioTags: z.array(z.string()),
+  mediaInfoQuality: z.enum(['probe', 'indexer', 'addon']).optional(),
   languages: z.array(z.string()),
   subtitles: z.array(z.string()).optional(),
   subbed: z.boolean().optional(),

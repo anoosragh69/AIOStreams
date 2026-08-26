@@ -1,5 +1,10 @@
 import { extract, FuzzballExtractOptions } from 'fuzzball';
-import { createLogger } from '../utils/index.js';
+import {
+  createLogger,
+  constants,
+  FULL_LANGUAGE_MAPPING,
+  getLanguageDisplayName,
+} from '../utils/index.js';
 import { MetadataTitle } from '../metadata/utils.js';
 
 const logger = createLogger('parser');
@@ -210,7 +215,7 @@ export function normaliseTitle(title: string) {
 export function cleanTitle(title: string, language?: string) {
   let cleaned = foldToAscii(title, language);
 
-  for (const char of ['♪', '♫', '★', '☆', '♡', '♥', '-', ';',':']) {
+  for (const char of ['♪', '♫', '★', '☆', '♡', '♥', '-', ';', ':']) {
     cleaned = cleaned.replaceAll(char, ' ');
   }
 
@@ -323,4 +328,57 @@ export function extractInfoHashFromMagnet(magnet: string): string | undefined {
   if (!match) return undefined;
   if (match.length === 40) return match.toLowerCase();
   return base32ToHex(match);
+}
+
+/** Matches one or more flag emojis (each two regional indicator chars) after an indicator emoji. */
+function getFlagRegex(indicator: string): RegExp {
+  const escapedIndicator = indicator.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(
+    `${escapedIndicator}\\s*((?:[\\u{1F1E6}-\\u{1F1FF}]{2}\\s*)+)`,
+    'u'
+  );
+}
+
+export function convertFlagToLanguage(flag: string): string | undefined {
+  const possibleLanguages = FULL_LANGUAGE_MAPPING.filter(
+    (language) => language.flag === flag
+  );
+  const language =
+    possibleLanguages.find((l) => l.flag_priority) || possibleLanguages[0];
+  if (!language) return undefined;
+  const languageName = getLanguageDisplayName(language);
+  return constants.LANGUAGES.includes(languageName as any)
+    ? languageName
+    : undefined;
+}
+
+/** Extracts every flag emoji (two regional indicator chars) from text and converts each to a language. */
+function extractLanguagesFromFlags(text: string): string[] {
+  const flags = text.match(/[\u{1F1E6}-\u{1F1FF}]{2}/gu) ?? [];
+  return flags
+    .map(convertFlagToLanguage)
+    .filter((language) => language !== undefined);
+}
+
+/** Extracts languages from flag emojis after a marker emoji, or undefined if the marker isn't present. */
+export function getLanguagesAfterMarker(
+  text: string | null | undefined,
+  indicator: string
+): string[] | undefined {
+  const match = text?.match(getFlagRegex(indicator));
+  return match ? extractLanguagesFromFlags(match[1]) : undefined;
+}
+
+export function getRegexForTextAfterEmojis(emojis: string[]): RegExp {
+  // Boundary also matches char+U+FE0F (e.g. ⚙️ needs it to render as emoji).
+  // Keeps all JS line terminators out of the separator/capture so lines
+  // can't bleed together.
+  const lineTerminators = '\\r\\n\\u2028\\u2029';
+  const escapedEmojis = emojis.map((emoji) =>
+    emoji.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  );
+  return new RegExp(
+    `(?:${escapedEmojis.join('|')})[^\\S${lineTerminators}]*([^\\p{Emoji_Presentation}${lineTerminators}]*?)(?=\\p{Emoji_Presentation}|.\\uFE0F|[${lineTerminators}]|$)`,
+    'u'
+  );
 }

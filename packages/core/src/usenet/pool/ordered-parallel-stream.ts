@@ -2,6 +2,14 @@ import { Readable } from 'node:stream';
 import type { Logger } from '../../logging/logger.js';
 import { definitiveLossKind } from '../nntp/errors.js';
 import type { HoleKind } from '../holes.js';
+import { roundSlotSize } from './slot-size.js';
+
+/**
+ * Read-ahead budget floor, in tasks. Keeps the link busy until the first task
+ * lands without splitting it away from that task (1 idles the link, 8 costs
+ * first-byte latency).
+ */
+const FLOOR_TASKS = 4;
 
 export interface SlotPoolOptions {
   /** Hard cap on pooled slots; beyond it acquire() returns throwaway buffers. */
@@ -45,17 +53,24 @@ export class SlotPool {
   /** Check out a slot of at least `need` bytes for task `idx`. */
   acquire(idx: number, need: number): Buffer {
     this.reclaim();
-    let buf: Buffer | undefined;
-    while ((buf = this.free.pop()) && buf.length < need) {
-      // Undersized slot (mixed task sizes): drop it.
-      this.allocated--;
+    const size = roundSlotSize(need);
+    // Smallest free slot that fits; on a miss one undersized slot is dropped
+    // so the pool converges on the larger size rather than growing.
+    let best = -1;
+    for (let i = 0; i < this.free.length; i++) {
+      const len = this.free[i].length;
+      if (len >= size && (best < 0 || len < this.free[best].length)) best = i;
     }
-    if (!buf) {
+    let buf: Buffer;
+    if (best >= 0) {
+      buf = this.free.splice(best, 1)[0];
+    } else {
+      if (this.free.pop()) this.allocated--;
       if (this.allocated >= this.slotCap) {
         return Buffer.allocUnsafe(need);
       }
       this.allocated++;
-      buf = Buffer.allocUnsafe(need);
+      buf = Buffer.allocUnsafe(size);
     }
     if (buf.length > this.maxSlotBytes) this.maxSlotBytes = buf.length;
     this.live.set(idx, buf);
@@ -129,14 +144,16 @@ export interface OrderedParallelStreamOptions {
   maxBufferedBytes: number;
   slotCap: number;
   initialMaxSlot: number;
+  /** Nominal bytes per task, for the read-ahead budget. */
+  taskBytes: number;
   /** Subclass logger so log scopes stay per stream kind. */
   logger: Logger;
 }
 
 /**
  * Base for the engine's serve-path Readables ({@link SegmentsStream} and
- * {@link ParallelRangeStream}): run up to `maxConcurrency` tasks in parallel,
- * bounded by a byte budget of not-yet-emitted chunks, and emit their results
+ * {@link ParallelRangeStream}): run up to `maxConcurrency` tasks in parallel
+ * under a read-ahead budget (see {@link dispatch}) and emit their results
  * strictly in task order, decoding into {@link SlotPool} slots.
  */
 export abstract class OrderedParallelStream extends Readable {
@@ -149,6 +166,7 @@ export abstract class OrderedParallelStream extends Readable {
 
   private readonly totalTasks: number;
   private readonly maxConcurrency: number;
+  private readonly taskBytes: number;
   private readonly maxBufferedBytes: number;
   private readonly logger: Logger;
 
@@ -158,6 +176,7 @@ export abstract class OrderedParallelStream extends Readable {
   private buffered = new Map<number, Buffer>();
   private bufferedBytes = 0;
   private paused = false;
+  private pushedBytes = 0;
   private destroyedFlag = false;
   /** Set once EOF has been pushed. */
   private ended = false;
@@ -166,6 +185,7 @@ export abstract class OrderedParallelStream extends Readable {
     super({ highWaterMark: Math.max(1, Math.ceil(opts.highWaterMark)) });
     this.totalTasks = opts.totalTasks;
     this.maxConcurrency = opts.maxConcurrency;
+    this.taskBytes = Math.max(1, opts.taskBytes);
     this.maxBufferedBytes = opts.maxBufferedBytes;
     this.logger = opts.logger;
     this.slots = new SlotPool({
@@ -275,13 +295,22 @@ export abstract class OrderedParallelStream extends Readable {
     cb(err);
   }
 
+  /**
+   * Read-ahead budget: bytes in flight plus settled-but-unemitted bytes may
+   * not exceed what the consumer has taken so far, between a floor and the
+   * full window plus reorder buffer.
+   */
   private dispatch(): void {
+    const budget = Math.min(
+      this.maxConcurrency * this.taskBytes + this.maxBufferedBytes,
+      Math.max(FLOOR_TASKS * this.taskBytes, this.pushedBytes)
+    );
     while (
       !this.destroyedFlag &&
       !this.ended &&
       this.inflight < this.maxConcurrency &&
       this.nextDispatch < this.totalTasks &&
-      this.bufferedBytes < this.maxBufferedBytes
+      this.bufferedBytes + this.inflight * this.taskBytes < budget
     ) {
       const idx = this.nextDispatch++;
       this.inflight++;
@@ -307,6 +336,7 @@ export abstract class OrderedParallelStream extends Readable {
         this.slots.release(idx);
       } else {
         more = this.push(out);
+        this.pushedBytes += out.length;
         this.slots.recordPush(idx, out.length);
       }
       if (this.endAfterChunk) {

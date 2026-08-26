@@ -14,6 +14,7 @@ import {
   proxyApi,
   templatesApi,
   syncApi,
+  linkedAccountsApi,
   authApi,
   dashboardApi,
   usenetApi,
@@ -56,6 +57,7 @@ import {
   errorMiddleware,
   corsMiddleware,
   staticRateLimiter,
+  linkedAccountsRateLimiter,
   internalMiddleware,
   stremioStreamRateLimiter,
   stremioManifestRateLimiter,
@@ -176,6 +178,7 @@ apiRouter.use('/anime', animeApi);
 apiRouter.use('/proxy', proxyApi);
 apiRouter.use('/templates', templatesApi);
 apiRouter.use('/sync', syncApi);
+apiRouter.use('/linked-accounts', linkedAccountsRateLimiter, linkedAccountsApi);
 apiRouter.use('/auth', authApi);
 apiRouter.use('/dashboard', dashboardApi);
 apiRouter.use('/usenet', usenetApi);
@@ -269,15 +272,13 @@ app.use('/blocklist', publicBlocklistRouter);
 // change, so they are immutable and safe to cache aggressively. Deliberately
 // NOT behind staticRateLimiter: a single page load pulls many of these and
 // rate-limiting them is what caused asset fetch failures + the logo flash.
-app.get('/assets/*any', (req, res, next) => {
-  const filePath = path.resolve(frontendRoot, req.path.replace(/^\//, ''));
-  if (filePath.startsWith(frontendRoot) && fs.existsSync(filePath)) {
-    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-    res.sendFile(filePath);
-    return;
-  }
-  next();
-});
+app.use(
+  '/assets',
+  express.static(path.join(frontendRoot, 'assets'), {
+    immutable: true,
+    maxAge: '1y',
+  })
+);
 
 // Root-level static files (not content-hashed). Short cache; kept behind the
 // static rate limiter. The logo honours the alternate-design branding flag.
@@ -307,29 +308,10 @@ app.get(
     '/logo_alt.png',
   ],
   staticRateLimiter,
-  (req, res, next) => {
-    const filePath = path.resolve(frontendRoot, req.path.replace(/^\//, ''));
-    if (filePath.startsWith(frontendRoot) && fs.existsSync(filePath)) {
-      res.setHeader('Cache-Control', 'public, max-age=3600');
-      res.sendFile(filePath);
-      return;
-    }
-    next();
-  }
+  express.static(frontendRoot, { index: false, maxAge: '1h' })
 );
 
-app.get('/static/*any', corsMiddleware, (req, res, next) => {
-  const filePath = path.resolve(
-    staticRoot,
-    req.path.replace(/^\/static\//, '')
-  );
-  logger.debug(`Static file requested: ${filePath}`);
-  if (filePath.startsWith(staticRoot) && fs.existsSync(filePath)) {
-    res.sendFile(filePath);
-    return;
-  }
-  next();
-});
+app.use('/static', corsMiddleware, express.static(staticRoot));
 
 // legacy route handlers
 app.get(
