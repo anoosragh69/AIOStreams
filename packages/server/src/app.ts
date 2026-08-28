@@ -4,6 +4,7 @@ import {
   profilesApi,
   healthApi,
   statusApi,
+  internalTelemetryApi,
   formatApi,
   catalogApi,
   postersApi,
@@ -158,6 +159,7 @@ apiRouter.use('/user', userApi);
 apiRouter.use('/profiles', profilesApi);
 apiRouter.use('/health', healthApi);
 apiRouter.use('/status', statusApi);
+apiRouter.use('/internal', internalTelemetryApi);
 apiRouter.use('/format', formatApi);
 apiRouter.use('/catalogs', catalogApi);
 apiRouter.use('/posters', postersApi);
