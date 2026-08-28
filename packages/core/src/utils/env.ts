@@ -215,7 +215,7 @@ export const Env = cleanEnv(process.env, {
     default: `http://localhost:${process.env.PORT || 3000}`,
     desc: 'Internal URL of the addon, used for internal communication between built-in addons and the server',
   }),
-  INTERNAL_SECRET: readonly({
+  INTERNAL_SECRET: str({
     default: randomBytes(32).toString('hex'),
     desc: 'Internal secret for the addon, used for internal communication between built-in addons and the server',
   }),
