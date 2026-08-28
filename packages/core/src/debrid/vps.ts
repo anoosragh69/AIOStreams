@@ -52,6 +52,19 @@ interface VpsFilesResponse {
   files: VpsFile[];
 }
 
+interface VpsCacheFile {
+  id: number;
+  downloadId: string;
+  name: string;
+  size: number;
+  mimeType: string | null;
+  link: string;
+}
+
+interface VpsCacheResponse {
+  files: VpsCacheFile[];
+}
+
 export class VpsDebridService implements TorrentDebridService {
   readonly serviceName: ServiceId = 'vps';
   readonly capabilities = {
@@ -241,7 +254,7 @@ export class VpsDebridService implements TorrentDebridService {
     );
   }
 
-  async addMagnet(magnet: string, requestedFileName?: string): Promise<DebridDownload> {
+  async addMagnet(magnet: string, requestedFileName?: string, mediaKey?: string): Promise<DebridDownload> {
     const response = await this.request<VpsDownloadResponse>(
       '/api/v1/magnets',
       {
@@ -249,7 +262,7 @@ export class VpsDebridService implements TorrentDebridService {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ magnet, requestedFileName }),
+        body: JSON.stringify({ magnet, requestedFileName, mediaKey }),
       }
     );
 
@@ -258,7 +271,7 @@ export class VpsDebridService implements TorrentDebridService {
     return download;
   }
 
-  async addTorrent(torrentUrl: string, requestedFileName?: string): Promise<DebridDownload> {
+  async addTorrent(torrentUrl: string, requestedFileName?: string, mediaKey?: string): Promise<DebridDownload> {
     let torrentBuffer: Buffer;
     try {
       const response = await fetch(torrentUrl, {
@@ -317,7 +330,7 @@ export class VpsDebridService implements TorrentDebridService {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ source: torrentUrl, infohash, requestedFileName }),
+        body: JSON.stringify({ source: torrentUrl, infohash, requestedFileName, mediaKey }),
       }
     );
 
@@ -353,6 +366,53 @@ export class VpsDebridService implements TorrentDebridService {
     return response.link;
   }
 
+  buildMediaKey(metadata?: PlaybackInfo['metadata'], hash?: string): string | undefined {
+    if (!metadata) return undefined;
+
+    const parts: string[] = [];
+    if (metadata.season !== undefined && metadata.episode !== undefined) {
+      parts.push(`tv`);
+    } else {
+      parts.push(`movie`);
+    }
+
+    const title = metadata.titles?.[0];
+    if (title) {
+      parts.push(title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''));
+    }
+
+    if (metadata.season !== undefined) {
+      parts.push(`s${metadata.season}`);
+    }
+    if (metadata.episode !== undefined) {
+      parts.push(`e${metadata.episode}`);
+    }
+
+    if (hash) {
+      parts.push(hash.slice(0, 12));
+    }
+
+    return parts.join(':');
+  }
+
+  async checkCache(
+    mediaKey: string,
+    fileName?: string
+  ): Promise<VpsCacheFile | undefined> {
+    try {
+      const params = new URLSearchParams({ mediaKey });
+      if (fileName) params.set('fileName', fileName);
+
+      const response = await this.request<VpsCacheResponse>(
+        `/api/v1/cache/lookup?${params.toString()}`
+      );
+
+      return response.files?.[0];
+    } catch {
+      return undefined;
+    }
+  }
+
   async resolve(
     playbackInfo: PlaybackInfo,
     filename: string,
@@ -373,9 +433,10 @@ export class VpsDebridService implements TorrentDebridService {
       appConfig.builtins.debrid.useTorrentDownloadUrl;
 
     let download: DebridDownload;
+    const mediaKey = this.buildMediaKey(playbackInfo.metadata, playbackInfo.hash);
 
     if (useTorrentFile && playbackInfo.downloadUrl) {
-      download = await this.addTorrent(playbackInfo.downloadUrl, filename);
+      download = await this.addTorrent(playbackInfo.downloadUrl, filename, mediaKey);
     } else {
       let magnet = `magnet:?xt=urn:btih:${playbackInfo.hash}`;
 
@@ -387,7 +448,7 @@ export class VpsDebridService implements TorrentDebridService {
         magnet += `&tr=${encodeURIComponent(source)}`;
       }
 
-      download = await this.addMagnet(magnet, filename);
+      download = await this.addMagnet(magnet, filename, mediaKey);
     }
 
     // If the download already existed (deduplicated by infohash), don't set up failover cleanup
