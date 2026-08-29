@@ -16,8 +16,9 @@ import { PresetManager } from '../presets/index.js';
 import { FeatureControl } from '../utils/feature.js';
 import { StreamContext, StreamUtils } from '../streams/index.js';
 import { buildPlayChain, type FailoverContentType } from './play-chain.js';
-import { resolveServiceWrappedStreams } from './serviceWrapper.js';
+import { resolveServiceWrappedStreams, getServiceCredential } from './serviceWrapper.js';
 import type { ServiceWrapServiceTiming } from './serviceWrapper.js';
+import { VpsDebridService } from '../debrid/vps.js';
 import type { PrecomputeSubTimings } from '../streams/precomputer.js';
 import { StreamSelector } from '../parser/streamExpression.js';
 import type {
@@ -313,6 +314,12 @@ export async function processStreams(
   // wrapping), and runs before dedup for the same failover-variant reason.
   if (isMeta || resolvedResults.hasNewStreams) {
     processedStreams = await ctx.filterer.filterBlocklisted(processedStreams);
+  }
+
+  // §44: Inject VPS completed-cache streams (runs regardless of Service Wrap)
+  const vpsCacheStreams = await lookupVpsCacheStreams(ctx.userData, context);
+  if (vpsCacheStreams.length > 0) {
+    processedStreams = [...vpsCacheStreams, ...processedStreams];
   }
 
   const dedupStart = Date.now();
@@ -1148,4 +1155,80 @@ export async function getAddonCatalog(
     };
   }
   return { success: true, data: addonCatalogs, errors: [] };
+}
+
+/**
+ * §44: Look up VPS completed cache and return synthetic ParsedStream entries.
+ * This runs regardless of Service Wrap — it checks whether VPS already has the
+ * requested media cached and injects direct-play streams.
+ */
+async function lookupVpsCacheStreams(
+  userData: UserData,
+  context: StreamContext
+): Promise<ParsedStream[]> {
+  try {
+    const vpsService = userData.services?.find(
+      (s) => s.id === 'vps' && s.enabled !== false
+    );
+    if (!vpsService) return [];
+
+    const token = getServiceCredential(vpsService);
+    if (!token) return [];
+
+    const vps = new VpsDebridService({ token });
+
+    const metadata = await context.getMetadata();
+    const season = context.parsedId?.season
+      ? Number(context.parsedId.season)
+      : undefined;
+    const episode = context.parsedId?.episode
+      ? Number(context.parsedId.episode)
+      : undefined;
+
+    const titleMetadata = metadata
+      ? {
+          titles: metadata.titles?.map((t) => t.title) ?? [metadata.title],
+          season,
+          episode,
+          absoluteEpisode: metadata.absoluteEpisode,
+          seasonYear: metadata.seasonYear,
+        }
+      : undefined;
+
+    const mediaKey = vps.buildMediaKey(titleMetadata);
+    if (!mediaKey) return [];
+
+    const cacheFile = await vps.checkCache(mediaKey);
+    if (!cacheFile) return [];
+
+    const vpsAddon: Addon = {
+      preset: { id: 'vps-cache', type: 'debrid', options: {} },
+      manifestUrl: '',
+      enabled: true,
+      name: 'VPS Cache',
+      timeout: 5,
+    };
+
+    return [
+      {
+        id: `vps-cache-${cacheFile.id}-${mediaKey}`,
+        type: 'debrid',
+        addon: vpsAddon,
+        url: cacheFile.link,
+        service: {
+          id: 'vps',
+          cached: true,
+        },
+        size: cacheFile.size,
+        filename: cacheFile.name,
+        folderName: `[VPS CACHE] ${cacheFile.name}`,
+      },
+    ];
+  } catch (error) {
+    logger.debug(
+      { err: error instanceof Error ? error.message : String(error) },
+      'VPS cache lookup failed'
+    );
+    return [];
+  }
 }

@@ -16,9 +16,7 @@ import {
   fileInfoStore,
   TitleMetadata,
   FileInfo,
-  VpsDebridService,
 } from '../debrid/index.js';
-import type { TorrentWithSelectedFile } from '../debrid/utils.js';
 import { processTorrents } from '../builtins/utils/debrid.js';
 import { StreamContext } from '../streams/context.js';
 import { isServiceWrapEligibleP2PStream } from '../streams/utils.js';
@@ -174,9 +172,6 @@ export async function resolveServiceWrappedStreams(
   // Build metadata from StreamContext
   const metadata = await buildMetadata(context);
 
-  // Check VPS cache for media-key matches before processing through debrid services
-  const vpsCacheResults = await lookupVpsCache(uniqueTorrents, metadata, debridServices);
-
   // Process torrents through debrid services
   const processedTorrents = await processTorrents(
     uniqueTorrents,
@@ -197,20 +192,7 @@ export async function resolveServiceWrappedStreams(
 
   const serviceTimings = processedTorrents.serviceTimings;
 
-  // Prepend VPS cache hits (media-key based) before infohash-based results
-  // Deduplicate: if processTorrents already returned a cached result for a hash,
-  // skip the VPS cache entry to avoid duplicate streams
-  const normalCachedHashes = new Set(
-    processedTorrents.results
-      .filter((r) => r.service?.cached)
-      .map((r) => r.hash)
-  );
-  const filteredVpsCacheResults = vpsCacheResults.filter(
-    (r) => !normalCachedHashes.has(r.hash)
-  );
-  const allResults = [...filteredVpsCacheResults, ...processedTorrents.results];
-
-  if (allResults.length === 0) {
+  if (processedTorrents.results.length === 0) {
     return {
       streams: otherStreams,
       errors,
@@ -243,7 +225,7 @@ export async function resolveServiceWrappedStreams(
   }
 
   const debridStreams = await buildDebridStreams(
-    allResults,
+    processedTorrents.results,
     p2pByHash,
     encryptedStoreAuths,
     metadataId,
@@ -312,44 +294,6 @@ function buildDebridServices(userData: UserData): BuiltinDebridServices {
   }
 
   return debridServices;
-}
-
-async function lookupVpsCache(
-  torrents: Torrent[],
-  metadata: TitleMetadata | undefined,
-  debridServices: BuiltinDebridServices
-): Promise<TorrentWithSelectedFile[]> {
-  const vpsServiceConfig = debridServices.find((s) => s.id === 'vps');
-  if (!vpsServiceConfig) return [];
-
-  const vps = new VpsDebridService({ token: vpsServiceConfig.credential });
-  const results: TorrentWithSelectedFile[] = [];
-
-  for (const torrent of torrents) {
-    const mediaKey = vps.buildMediaKey(metadata, torrent.hash);
-    if (!mediaKey) continue;
-
-    const cacheFile = await vps.checkCache(mediaKey, torrent.title);
-    if (!cacheFile) continue;
-
-    results.push({
-      ...torrent,
-      file: {
-        id: cacheFile.id,
-        name: cacheFile.name,
-        size: cacheFile.size,
-        mimeType: cacheFile.mimeType ?? undefined,
-      },
-      downloadUrl: cacheFile.link,
-      service: {
-        id: 'vps',
-        cached: true,
-        library: false,
-      },
-    });
-  }
-
-  return results;
 }
 
 function buildAndDeduplicateTorrents(streams: ParsedStream[]): Torrent[] {
