@@ -1166,19 +1166,19 @@ async function lookupVpsCacheStreams(
   userData: UserData,
   context: StreamContext
 ): Promise<ParsedStream[]> {
-  const log = createLogger('vps-cache-lookup');
+  const log = createLogger('vps-cache');
   try {
     const vpsService = userData.services?.find(
       (s) => s.id === 'vps' && s.enabled !== false
     );
     if (!vpsService) {
-      log.debug('No VPS service found in user services');
+      log.info('No VPS service configured, skipping cache lookup');
       return [];
     }
 
     const token = getServiceCredential(vpsService);
     if (!token) {
-      log.debug('VPS service has no credential');
+      log.info('VPS service has no credential, skipping');
       return [];
     }
 
@@ -1202,22 +1202,17 @@ async function lookupVpsCacheStreams(
         }
       : undefined;
 
-    log.debug(
-      { titleMetadata, parsedId: context.parsedId, hasMetadata: !!metadata },
-      'Building media key for cache lookup'
-    );
-
     const mediaKey = vps.buildMediaKey(titleMetadata);
     if (!mediaKey) {
-      log.debug('Could not build media key');
+      log.info({ parsedId: context.parsedId, hasMetadata: !!metadata }, 'Could not build media key');
       return [];
     }
 
-    log.debug({ mediaKey }, 'Looking up VPS cache');
+    log.info({ mediaKey }, 'Checking VPS cache');
 
     const cacheFile = await vps.checkCache(mediaKey);
     if (!cacheFile) {
-      log.debug({ mediaKey }, 'No cache hit');
+      log.info({ mediaKey }, 'No VPS cache hit');
       return [];
     }
 
@@ -1247,7 +1242,7 @@ async function lookupVpsCacheStreams(
       },
     ];
   } catch (error) {
-    log.debug(
+    log.info(
       { err: error instanceof Error ? error.message : String(error) },
       'VPS cache lookup failed'
     );
