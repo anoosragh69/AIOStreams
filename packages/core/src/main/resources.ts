@@ -1166,14 +1166,21 @@ async function lookupVpsCacheStreams(
   userData: UserData,
   context: StreamContext
 ): Promise<ParsedStream[]> {
+  const log = createLogger('vps-cache-lookup');
   try {
     const vpsService = userData.services?.find(
       (s) => s.id === 'vps' && s.enabled !== false
     );
-    if (!vpsService) return [];
+    if (!vpsService) {
+      log.debug('No VPS service found in user services');
+      return [];
+    }
 
     const token = getServiceCredential(vpsService);
-    if (!token) return [];
+    if (!token) {
+      log.debug('VPS service has no credential');
+      return [];
+    }
 
     const vps = new VpsDebridService({ token });
 
@@ -1195,11 +1202,26 @@ async function lookupVpsCacheStreams(
         }
       : undefined;
 
+    log.debug(
+      { titleMetadata, parsedId: context.parsedId, hasMetadata: !!metadata },
+      'Building media key for cache lookup'
+    );
+
     const mediaKey = vps.buildMediaKey(titleMetadata);
-    if (!mediaKey) return [];
+    if (!mediaKey) {
+      log.debug('Could not build media key');
+      return [];
+    }
+
+    log.debug({ mediaKey }, 'Looking up VPS cache');
 
     const cacheFile = await vps.checkCache(mediaKey);
-    if (!cacheFile) return [];
+    if (!cacheFile) {
+      log.debug({ mediaKey }, 'No cache hit');
+      return [];
+    }
+
+    log.info({ mediaKey, fileName: cacheFile.name, id: cacheFile.id }, 'VPS cache HIT');
 
     const vpsAddon: Addon = {
       preset: { id: 'vps-cache', type: 'debrid', options: {} },
@@ -1225,7 +1247,7 @@ async function lookupVpsCacheStreams(
       },
     ];
   } catch (error) {
-    logger.debug(
+    log.debug(
       { err: error instanceof Error ? error.message : String(error) },
       'VPS cache lookup failed'
     );
