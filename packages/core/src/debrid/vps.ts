@@ -10,11 +10,14 @@ import {
   type TorrentDebridService,
 } from './base.js';
 import {
+  createLogger,
   fromUrlSafeBase64,
+  appConfig,
   type ServiceId,
 } from '../utils/index.js';
 import { removeDownloadOnAbort } from './utils.js';
-import { appConfig } from '../utils/index.js';
+
+const logger = createLogger('debrid:vps');
 
 interface VpsCredential {
   url: string;
@@ -463,7 +466,7 @@ export class VpsDebridService implements TorrentDebridService {
           signal ?? undefined,
           { id: String(download.id) },
           (id) => this.removeMagnet(id),
-          (m) => console.warn(`[VPS] ${m}`)
+          (m) => logger.warn(m)
         );
       }
     }

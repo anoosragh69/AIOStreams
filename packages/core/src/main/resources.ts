@@ -1173,13 +1173,13 @@ async function lookupVpsCacheStreams(
       (s) => s.id === 'vps' && s.enabled !== false
     );
     if (!vpsService) {
-      log.info('No VPS service configured, skipping cache lookup');
+      log.debug('No VPS service configured, skipping cache lookup');
       return [];
     }
 
     const token = getServiceCredential(vpsService);
     if (!token) {
-      log.info('VPS service has no credential, skipping');
+      log.debug('VPS service has no credential, skipping');
       return [];
     }
 
@@ -1205,15 +1205,15 @@ async function lookupVpsCacheStreams(
 
     const mediaKey = vps.buildMediaKey(titleMetadata);
     if (!mediaKey) {
-      log.info({ parsedId: context.parsedId, hasMetadata: !!metadata }, 'Could not build media key');
+      log.debug({ parsedId: context.parsedId, hasMetadata: !!metadata }, 'Could not build media key');
       return [];
     }
 
-    log.info({ mediaKey }, 'Checking VPS cache');
+    log.debug({ mediaKey }, 'Checking VPS cache');
 
     const cacheFile = await vps.checkCache(mediaKey);
     if (!cacheFile) {
-      log.info({ mediaKey }, 'No VPS cache hit');
+      log.debug({ mediaKey }, 'No VPS cache hit');
       return [];
     }
 
@@ -1246,7 +1246,7 @@ async function lookupVpsCacheStreams(
       },
     ];
   } catch (error) {
-    log.info(
+    log.warn(
       { err: error instanceof Error ? error.message : String(error) },
       'VPS cache lookup failed'
     );
