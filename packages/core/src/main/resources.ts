@@ -1219,7 +1219,7 @@ async function lookupVpsCacheStreams(
     log.info({ mediaKey, fileName: cacheFile.name, id: cacheFile.id }, 'VPS cache HIT');
 
     const vpsAddon: Addon = {
-      preset: { id: 'vps-cache', type: 'debrid', options: {} },
+      preset: { id: 'vps-cache', type: '', options: {} },
       manifestUrl: '',
       enabled: true,
       name: 'VPS Cache',
