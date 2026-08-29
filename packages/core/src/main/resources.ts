@@ -19,6 +19,7 @@ import { buildPlayChain, type FailoverContentType } from './play-chain.js';
 import { resolveServiceWrappedStreams, getServiceCredential } from './serviceWrapper.js';
 import type { ServiceWrapServiceTiming } from './serviceWrapper.js';
 import { VpsDebridService } from '../debrid/vps.js';
+import FileParser from '../parser/file.js';
 import type { PrecomputeSubTimings } from '../streams/precomputer.js';
 import { StreamSelector } from '../parser/streamExpression.js';
 import type {
@@ -1226,6 +1227,8 @@ async function lookupVpsCacheStreams(
       timeout: 5,
     };
 
+    const parsedFile = FileParser.parse(cacheFile.name);
+
     return [
       {
         id: `vps-cache-${cacheFile.id}-${mediaKey}`,
@@ -1236,9 +1239,10 @@ async function lookupVpsCacheStreams(
           id: 'vps',
           cached: true,
         },
+        parsedFile,
         size: cacheFile.size,
         filename: cacheFile.name,
-        folderName: `[VPS CACHE] ${cacheFile.name}`,
+        folderName: `[VPS CACHE]`,
       },
     ];
   } catch (error) {
