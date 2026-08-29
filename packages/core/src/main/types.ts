@@ -46,6 +46,7 @@ export type PipelineTimings = {
   serviceWrapMs: number;
   serviceWrapTimings?: Record<string, ServiceWrapServiceTiming>;
   filterMs: number;
+  vpsCacheMs: number;
   deduplicationMs: number;
   precomputeMs: number;
   precomputeSubTimings?: PrecomputeSubTimings;

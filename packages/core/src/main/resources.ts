@@ -259,6 +259,7 @@ export async function processStreams(
     serviceWrapMs: number;
     serviceWrapTimings?: Record<string, ServiceWrapServiceTiming>;
     filterMs: number;
+    vpsCacheMs: number;
     deduplicationMs: number;
     precomputeMs: number;
     precomputeSubTimings?: PrecomputeSubTimings;
@@ -275,6 +276,7 @@ export async function processStreams(
   let serviceWrapMs = 0;
   let serviceWrapTimings: Record<string, ServiceWrapServiceTiming> | undefined;
   let filterMs = 0;
+  let vpsCacheMs = 0;
   let deduplicationMs = 0;
   let precomputeMs = 0;
   let precomputeSubTimings: PrecomputeSubTimings | undefined;
@@ -318,7 +320,9 @@ export async function processStreams(
   }
 
   // §44: Inject VPS completed-cache streams (runs regardless of Service Wrap)
+  const vpsCacheStart = Date.now();
   const vpsCacheStreams = await lookupVpsCacheStreams(ctx.userData, context);
+  vpsCacheMs = Date.now() - vpsCacheStart;
   if (vpsCacheStreams.length > 0) {
     processedStreams = [...vpsCacheStreams, ...processedStreams];
   }
@@ -485,6 +489,7 @@ export async function processStreams(
       serviceWrapMs,
       serviceWrapTimings,
       filterMs,
+      vpsCacheMs,
       deduplicationMs,
       precomputeMs,
       precomputeSubTimings,
@@ -1195,7 +1200,7 @@ async function lookupVpsCacheStreams(
 
     const titleMetadata = metadata
       ? {
-          titles: metadata.titles?.map((t) => t.title) ?? [metadata.title],
+          titles: metadata.titles?.map((t) => t.title) ?? (metadata.title ? [metadata.title] : []),
           season,
           episode,
           absoluteEpisode: metadata.absoluteEpisode,
@@ -1221,7 +1226,7 @@ async function lookupVpsCacheStreams(
 
     const vpsAddon: Addon = {
       preset: { id: 'vps-cache', type: '', options: {} },
-      manifestUrl: '',
+      manifestUrl: 'https://vps-cache.local',
       enabled: true,
       name: 'VPS Cache',
       timeout: 5,
