@@ -405,7 +405,7 @@ export class VpsDebridService implements TorrentDebridService {
   async checkCache(
     mediaKey: string,
     fileName?: string
-  ): Promise<VpsCacheFile | undefined> {
+  ): Promise<VpsCacheFile[]> {
     try {
       const params = new URLSearchParams({ mediaKey });
       if (fileName) params.set('fileName', fileName);
@@ -414,9 +414,9 @@ export class VpsDebridService implements TorrentDebridService {
         `/api/v1/cache/lookup?${params.toString()}`
       );
 
-      return response.files?.[0];
+      return response.files ?? [];
     } catch {
-      return undefined;
+      return [];
     }
   }
 

@@ -1216,13 +1216,39 @@ async function lookupVpsCacheStreams(
 
     log.debug({ mediaKey }, 'Checking VPS cache');
 
-    const cacheFile = await vps.checkCache(mediaKey);
-    if (!cacheFile) {
+    // Build an episode-aware filename hint so the VPS returns the correct file
+    // when multiple episodes share the same download record (same infohash).
+    const fileNameHint = episode !== undefined
+      ? `e${episode}`
+      : undefined;
+
+    const cacheFiles = await vps.checkCache(mediaKey, fileNameHint);
+    if (cacheFiles.length === 0) {
       log.debug({ mediaKey }, 'No VPS cache hit');
       return [];
     }
 
-    log.info({ mediaKey, fileName: cacheFile.name, id: cacheFile.id }, 'VPS cache HIT');
+    // When multiple files match (e.g. different episodes from same torrent),
+    // pick the best one. If we have an episode hint, prefer the file whose
+    // name contains the episode pattern. Otherwise take the first match.
+    const cacheFile = cacheFiles.length === 1
+      ? cacheFiles[0]
+      : cacheFiles.find((f) => {
+          if (episode === undefined) return false;
+          const lower = f.name.toLowerCase();
+          // Match patterns like "e06", "e6", "ep06", "episode.06", "s01e06"
+          const epPatterns = [
+            `e${episode}`,
+            `e${String(episode).padStart(2, '0')}`,
+            `ep${episode}`,
+            `ep${String(episode).padStart(2, '0')}`,
+            `episode.${episode}`,
+            `episode ${episode}`,
+          ];
+          return epPatterns.some((p) => lower.includes(p));
+        }) ?? cacheFiles[0];
+
+    log.info({ mediaKey, fileName: cacheFile.name, id: cacheFile.id, totalFiles: cacheFiles.length }, 'VPS cache HIT');
 
     const vpsAddon: Addon = {
       preset: { id: 'vps-cache', type: '', options: {} },
