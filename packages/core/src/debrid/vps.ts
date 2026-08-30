@@ -46,6 +46,10 @@ interface VpsDownloadResponse {
   existing?: boolean;
 }
 
+interface VpsDebridDownload extends DebridDownload {
+  existing?: boolean;
+}
+
 interface VpsListResponse {
   downloads: VpsDownload[];
 }
@@ -257,7 +261,7 @@ export class VpsDebridService implements TorrentDebridService {
     );
   }
 
-  async addMagnet(magnet: string, requestedFileName?: string, mediaKey?: string): Promise<DebridDownload> {
+  async addMagnet(magnet: string, requestedFileName?: string, mediaKey?: string): Promise<VpsDebridDownload> {
     const response = await this.request<VpsDownloadResponse>(
       '/api/v1/magnets',
       {
@@ -269,12 +273,12 @@ export class VpsDebridService implements TorrentDebridService {
       }
     );
 
-    const download = this.toDebridDownload(response.download);
-    (download as DebridDownload & { existing?: boolean }).existing = response.existing ?? false;
+    const download: VpsDebridDownload = this.toDebridDownload(response.download);
+    download.existing = response.existing ?? false;
     return download;
   }
 
-  async addTorrent(torrentUrl: string, requestedFileName?: string, mediaKey?: string): Promise<DebridDownload> {
+  async addTorrent(torrentUrl: string, requestedFileName?: string, mediaKey?: string): Promise<VpsDebridDownload> {
     let torrentBuffer: Buffer;
     try {
       const response = await fetch(torrentUrl, {
@@ -337,8 +341,8 @@ export class VpsDebridService implements TorrentDebridService {
       }
     );
 
-    const download = this.toDebridDownload(response.download);
-    (download as DebridDownload & { existing?: boolean }).existing = response.existing ?? false;
+    const download: VpsDebridDownload = this.toDebridDownload(response.download);
+    download.existing = response.existing ?? false;
     return download;
   }
 
@@ -435,7 +439,7 @@ export class VpsDebridService implements TorrentDebridService {
       playbackInfo.downloadUrl &&
       appConfig.builtins.debrid.useTorrentDownloadUrl;
 
-    let download: DebridDownload;
+    let download: VpsDebridDownload;
     const mediaKey = this.buildMediaKey(playbackInfo.metadata, playbackInfo.hash);
 
     if (useTorrentFile && playbackInfo.downloadUrl) {
@@ -456,8 +460,7 @@ export class VpsDebridService implements TorrentDebridService {
 
     // If the download already existed (deduplicated by infohash), don't set up failover cleanup
     // The existing download is managed by the VPS backend's 7-day retention policy
-    const existing = (download as DebridDownload & { existing?: boolean }).existing ?? false;
-    if (!existing) {
+    if (!download.existing) {
       // Set up failover cleanup: if this resolve attempt loses the parallel race,
       // remove the download we just created. Skip for private torrents (seeding obligations)
       // and library entries (serviceItemId).
