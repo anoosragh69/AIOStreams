@@ -1,4 +1,4 @@
-import { z, ZodError } from 'zod';
+import { ZodError } from 'zod';
 
 type ZodIssue = ZodError['issues'][number];
 
@@ -83,8 +83,4 @@ function formatIssue(issue: ZodIssue, depth: number): string {
   return `${indent}${path}: ${issue.message} (${issue.code})`;
 }
 
-/**
- * Best-effort: re-export the legacy prettifier in case any caller wants the
- * single-line form. New code should prefer {@link formatZodError}.
- */
-export const prettifyZodError = (error: ZodError) => z.prettifyError(error);
+
