@@ -211,11 +211,6 @@ export function languageToCode(language: string): string | undefined {
   if (cached !== undefined || LANGUAGE_CODE_CACHE.has(language)) return cached;
 
   const result = computeLanguageCode(language);
-  // values come from parsed release names, so bound the cache rather than
-  // letting junk input grow it forever
-  if (LANGUAGE_CODE_CACHE.size >= LANGUAGE_CODE_CACHE_MAX) {
-    LANGUAGE_CODE_CACHE.clear();
-  }
   LANGUAGE_CODE_CACHE.set(language, result);
   return result;
 }
@@ -226,7 +221,6 @@ export function languageToCode(language: string): string | undefined {
  * stream, so the result is memoised above.
  */
 const LANGUAGE_CODE_CACHE = new Map<string, string | undefined>();
-const LANGUAGE_CODE_CACHE_MAX = 1000;
 
 function computeLanguageCode(language: string): string | undefined {
   const possibleLangs = FULL_LANGUAGE_MAPPING.filter(
