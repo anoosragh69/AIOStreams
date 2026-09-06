@@ -1,0 +1,163 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {
+      "id": "packages_core_src_utils_format_zod_error_formatzoderroroptions",
+      "label": "FormatZodErrorOptions",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "format-zod-error.ts",
+      "file_type": "code",
+      "norm_label": "formatzoderroroptions",
+      "source_file": "packages/core/src/utils/format-zod-error.ts",
+      "source_location": "L5"
+    },
+    {
+      "id": "packages_core_src_utils_format_zod_error_zodissue",
+      "label": "ZodIssue",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "format-zod-error.ts",
+      "file_type": "code",
+      "norm_label": "zodissue",
+      "source_file": "packages/core/src/utils/format-zod-error.ts",
+      "source_location": "L3"
+    },
+    {
+      "id": "packages_core_src_utils_format_zod_error_formatissue",
+      "label": "formatIssue()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "formatIssues",
+      "file_type": "code",
+      "norm_label": "formatissue()",
+      "source_file": "packages/core/src/utils/format-zod-error.ts",
+      "source_location": "L64"
+    },
+    {
+      "id": "packages_core_src_utils_format_zod_error_formatissues",
+      "label": "formatIssues()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "formatIssues",
+      "file_type": "code",
+      "norm_label": "formatissues()",
+      "source_file": "packages/core/src/utils/format-zod-error.ts",
+      "source_location": "L60"
+    },
+    {
+      "id": "packages_core_src_utils_format_zod_error_formatzoderror",
+      "label": "formatZodError()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "formatIssues",
+      "file_type": "code",
+      "norm_label": "formatzoderror()",
+      "source_file": "packages/core/src/utils/format-zod-error.ts",
+      "source_location": "L37"
+    },
+    {
+      "id": "packages_core_src_utils_format_zod_error",
+      "label": "format-zod-error.ts",
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "format-zod-error.ts",
+      "file_type": "code",
+      "norm_label": "format-zod-error.ts",
+      "source_file": "packages/core/src/utils/format-zod-error.ts",
+      "source_location": "L1"
+    }
+  ],
+  "links": [
+    {
+      "source": "packages_core_src_utils_format_zod_error_formatissue",
+      "target": "packages_core_src_utils_format_zod_error_formatissues",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "packages/core/src/utils/format-zod-error.ts",
+      "source_location": "L76",
+      "weight": 1.0
+    },
+    {
+      "source": "packages_core_src_utils_format_zod_error_formatzoderror",
+      "target": "packages_core_src_utils_format_zod_error_formatissues",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "packages/core/src/utils/format-zod-error.ts",
+      "source_location": "L42",
+      "weight": 1.0
+    },
+    {
+      "source": "packages_core_src_utils_format_zod_error",
+      "target": "packages_core_src_utils_format_zod_error_zodissue",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "packages/core/src/utils/format-zod-error.ts",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "packages_core_src_utils_format_zod_error",
+      "target": "packages_core_src_utils_format_zod_error_formatzoderror",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "packages/core/src/utils/format-zod-error.ts",
+      "source_location": "L37",
+      "weight": 1.0
+    },
+    {
+      "source": "packages_core_src_utils_format_zod_error",
+      "target": "packages_core_src_utils_format_zod_error_formatzoderroroptions",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "packages/core/src/utils/format-zod-error.ts",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "packages_core_src_utils_format_zod_error",
+      "target": "packages_core_src_utils_format_zod_error_formatissues",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "packages/core/src/utils/format-zod-error.ts",
+      "source_location": "L60",
+      "weight": 1.0
+    },
+    {
+      "source": "packages_core_src_utils_format_zod_error",
+      "target": "packages_core_src_utils_format_zod_error_formatissue",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "packages/core/src/utils/format-zod-error.ts",
+      "source_location": "L64",
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [],
+  "built_at_commit": "d2817ae8b738f3259ec4d53cc640f1be8f4d9971"
+}
