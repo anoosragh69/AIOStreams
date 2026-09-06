@@ -41,13 +41,26 @@ interface VpsDownload {
   files?: VpsFile[];
 }
 
+interface VpsFileRequest {
+  id: string;
+  status: string;
+}
+
 interface VpsDownloadResponse {
   download: VpsDownload;
   existing?: boolean;
+  fileRequest?: VpsFileRequest;
+}
+
+interface VpsDownloadDetailResponse {
+  download: VpsDownload;
+  qbit: Record<string, unknown> | null;
+  fileRequests: VpsFileRequest[];
 }
 
 interface VpsDebridDownload extends DebridDownload {
   existing?: boolean;
+  fileRequestId?: string;
 }
 
 interface VpsListResponse {
@@ -275,6 +288,7 @@ export class VpsDebridService implements TorrentDebridService {
 
     const download: VpsDebridDownload = this.toDebridDownload(response.download);
     download.existing = response.existing ?? false;
+    download.fileRequestId = response.fileRequest?.id;
     return download;
   }
 
@@ -343,6 +357,7 @@ export class VpsDebridService implements TorrentDebridService {
 
     const download: VpsDebridDownload = this.toDebridDownload(response.download);
     download.existing = response.existing ?? false;
+    download.fileRequestId = response.fileRequest?.id;
     return download;
   }
 
@@ -354,6 +369,14 @@ export class VpsDebridService implements TorrentDebridService {
     }>(`/api/v1/magnets/${encodeURIComponent(magnetId)}`);
 
     return this.toDebridDownload(response.download);
+  }
+
+  async getDownloadDetail(
+    magnetId: string
+  ): Promise<VpsDownloadDetailResponse> {
+    return this.request<VpsDownloadDetailResponse>(
+      `/api/v1/magnets/${encodeURIComponent(magnetId)}`
+    );
   }
 
   async removeMagnet(magnetId: string): Promise<void> {
@@ -480,6 +503,7 @@ export class VpsDebridService implements TorrentDebridService {
       }
 
       const deadline = Date.now() + this.maxWaitTime;
+      const fileRequestId = download.fileRequestId;
 
       while (Date.now() < deadline) {
         if (signal?.aborted) {
@@ -494,12 +518,47 @@ export class VpsDebridService implements TorrentDebridService {
 
         await sleep(this.pollingInterval);
 
-        let currentDownload: DebridDownload;
         try {
-          currentDownload = await this.getMagnet(String(download.id));
+          const detail = await this.getDownloadDetail(String(download.id));
+
+          // Check if our specific fileRequest completed
+          if (fileRequestId) {
+            const fileRequest = detail.fileRequests.find((fr) => fr.id === fileRequestId);
+            if (fileRequest?.status === 'completed') {
+              download = this.toDebridDownload(detail.download);
+              break;
+            }
+            if (fileRequest?.status === 'failed') {
+              throw new DebridError('VPS file request failed', {
+                statusCode: 502,
+                statusText: 'VPS Download Failed',
+                code: 'DOWNLOAD_FAILED',
+                headers: {},
+                body: detail.download,
+              });
+            }
+          } else {
+            // Legacy path: poll by download status
+            const currentDownload = this.toDebridDownload(detail.download);
+            if (currentDownload.status === 'downloaded') {
+              download = currentDownload;
+              break;
+            }
+            if (currentDownload.status === 'failed' || currentDownload.status === 'invalid') {
+              throw new DebridError(
+                `VPS download ${currentDownload.status}`,
+                {
+                  statusCode: 502,
+                  statusText: 'VPS Download Failed',
+                  code: 'DOWNLOAD_FAILED',
+                  headers: {},
+                  body: currentDownload,
+                }
+              );
+            }
+            download = currentDownload;
+          }
         } catch (error) {
-          // Download might have been deleted (failover cleanup or manual removal)
-          // Treat as timeout to allow failover to try other sources
           if (error instanceof DebridError && error.statusCode === 404) {
             throw new DebridError('VPS download not found (may have been cleaned up)', {
               statusCode: 408,
@@ -511,26 +570,6 @@ export class VpsDebridService implements TorrentDebridService {
           }
           throw error;
         }
-
-        if (currentDownload.status === 'downloaded') {
-          download = currentDownload;
-          break;
-        }
-
-        if (currentDownload.status === 'failed' || currentDownload.status === 'invalid') {
-          throw new DebridError(
-            `VPS download ${currentDownload.status}`,
-            {
-              statusCode: 502,
-              statusText: 'VPS Download Failed',
-              code: 'DOWNLOAD_FAILED',
-              headers: {},
-              body: currentDownload,
-            }
-          );
-        }
-
-        download = currentDownload;
       }
 
       if (download.status !== 'downloaded') {
