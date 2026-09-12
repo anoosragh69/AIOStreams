@@ -291,6 +291,17 @@ export async function processStreams(
     metaFilterMs = Date.now() - metaFilterStart;
   }
 
+  // §44: Inject VPS completed-cache streams (runs before Service Wrap so the
+  // progress stream is visible while a download is still in progress; resolve()
+  // blocks in a polling loop until completion, so running cache lookup after
+  // it would only ever find finished downloads).
+  const vpsCacheStart = Date.now();
+  const vpsCacheStreams = await lookupVpsCacheStreams(ctx.userData, context);
+  vpsCacheMs = Date.now() - vpsCacheStart;
+  if (vpsCacheStreams.length > 0) {
+    processedStreams = [...vpsCacheStreams, ...processedStreams];
+  }
+
   const preServiceWrapIds = new Set(processedStreams.map((s) => s.id));
   const serviceWrapStart = Date.now();
   const resolvedResults = await resolveServiceWrappedStreams(
@@ -317,14 +328,6 @@ export async function processStreams(
   // wrapping), and runs before dedup for the same failover-variant reason.
   if (isMeta || resolvedResults.hasNewStreams) {
     processedStreams = await ctx.filterer.filterBlocklisted(processedStreams);
-  }
-
-  // §44: Inject VPS completed-cache streams (runs regardless of Service Wrap)
-  const vpsCacheStart = Date.now();
-  const vpsCacheStreams = await lookupVpsCacheStreams(ctx.userData, context);
-  vpsCacheMs = Date.now() - vpsCacheStart;
-  if (vpsCacheStreams.length > 0) {
-    processedStreams = [...vpsCacheStreams, ...processedStreams];
   }
 
   const dedupStart = Date.now();
