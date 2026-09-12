@@ -1163,6 +1163,12 @@ export async function getAddonCatalog(
   return { success: true, data: addonCatalogs, errors: [] };
 }
 
+/** Format an in-progress VPS download's progress (0..1) into a stream label. */
+function formatVpsDownloadingName(progress: number): string {
+  const pct = Math.round(progress * 100);
+  return `Downloading in progress (${pct}%)`;
+}
+
 /**
  * §44: Look up VPS completed cache and return synthetic ParsedStream entries.
  * This runs regardless of Service Wrap — it checks whether VPS already has the
@@ -1224,7 +1230,33 @@ async function lookupVpsCacheStreams(
 
     const cacheFiles = await vps.checkCache(mediaKey, fileNameHint);
     if (cacheFiles.length === 0) {
-      log.debug({ mediaKey }, 'No VPS cache hit');
+      log.debug({ mediaKey }, 'No VPS cache hit; checking for an in-progress download');
+
+      const progress = await vps.getActiveDownloadProgress(mediaKey);
+
+      if (progress !== undefined) {
+        const filename = formatVpsDownloadingName(progress);
+
+        const vpsAddon: Addon = {
+          preset: { id: 'vps-cache', type: '', options: {} },
+          manifestUrl: 'https://vps-cache.local',
+          enabled: true,
+          name: 'VPS Cache',
+          timeout: 5,
+        };
+
+        return [
+          {
+            id: `vps-downloading-${mediaKey}`,
+            type: 'debrid' as const,
+            addon: vpsAddon,
+            service: { id: 'vps' as const, cached: false },
+            filename,
+            folderName: `[VPS CACHE]`,
+            originalName: filename,
+          },
+        ];
+      }
       return [];
     }
 

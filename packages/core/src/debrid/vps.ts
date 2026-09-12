@@ -83,6 +83,11 @@ interface VpsCacheFile {
 
 interface VpsCacheResponse {
   files: VpsCacheFile[];
+  active?: {
+    id: string;
+    status: string;
+    progress?: number;
+  };
 }
 
 export class VpsDebridService implements TorrentDebridService {
@@ -379,6 +384,24 @@ export class VpsDebridService implements TorrentDebridService {
     );
   }
 
+  /**
+   * Single-shot download progress snapshot (0..1) for a download id, or
+   * `undefined` when the download was not found / has no live qbit progress.
+   * Used for non-blocking progress display, not the cache-and-play poll loop.
+   */
+  async getDownloadProgress(magnetId: string): Promise<number | undefined> {
+    try {
+      const detail = await this.getDownloadDetail(magnetId);
+      const progress = detail.qbit?.progress;
+      if (typeof progress !== 'number' || !Number.isFinite(progress)) {
+        return undefined;
+      }
+      return Math.min(Math.max(progress, 0), 1);
+    } catch {
+      return undefined;
+    }
+  }
+
   async removeMagnet(magnetId: string): Promise<void> {
     await this.request(
       `/api/v1/magnets/${encodeURIComponent(magnetId)}`,
@@ -440,6 +463,24 @@ export class VpsDebridService implements TorrentDebridService {
       return response.files ?? [];
     } catch {
       return [];
+    }
+  }
+
+  /** Active-download progress (0..1) for a media key, or `undefined` when the
+   *  media key has no in-progress download (or the VPS did not report one). */
+  async getActiveDownloadProgress(mediaKey: string): Promise<number | undefined> {
+    try {
+      const params = new URLSearchParams({ mediaKey });
+      const response = await this.request<VpsCacheResponse>(
+        `/api/v1/cache/lookup?${params.toString()}`
+      );
+      const progress = response.active?.progress;
+      if (typeof progress !== 'number' || !Number.isFinite(progress)) {
+        return undefined;
+      }
+      return Math.min(Math.max(progress, 0), 1);
+    } catch {
+      return undefined;
     }
   }
 
