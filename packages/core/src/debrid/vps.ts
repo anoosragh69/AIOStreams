@@ -15,8 +15,6 @@ import {
   appConfig,
   type ServiceId,
 } from '../utils/index.js';
-import { removeDownloadOnAbort } from './utils.js';
-
 const logger = createLogger('debrid:vps');
 
 interface VpsCredential {
@@ -525,17 +523,9 @@ export class VpsDebridService implements TorrentDebridService {
     // If the download already existed (deduplicated by infohash), don't set up failover cleanup
     // The existing download is managed by the VPS backend's 7-day retention policy
     if (!download.existing) {
-      // Set up failover cleanup: if this resolve attempt loses the parallel race,
-      // remove the download we just created. Skip for private torrents (seeding obligations)
-      // and library entries (serviceItemId).
-      if (!playbackInfo.serviceItemId && !playbackInfo.private) {
-        removeDownloadOnAbort(
-          signal ?? undefined,
-          { id: String(download.id) },
-          (id) => this.removeMagnet(id),
-          (m) => logger.warn(m)
-        );
-      }
+      // §81: Do NOT clean up downloads on abort. The download must persist so that
+      // on re-entry the VPS cache lookup can surface a progress stream. The VPS
+      // backend's retention policy handles cleanup of stale downloads.
     }
 
     if (download.status !== 'downloaded') {
