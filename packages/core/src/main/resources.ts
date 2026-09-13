@@ -1248,11 +1248,14 @@ async function lookupVpsCacheStreams(
           timeout: 5,
         };
 
+        const placeholderUrl = `https://vps-cache.local/downloading?progress=${Math.round(progress * 100)}`;
+
         return [
           {
             id: `vps-downloading-${mediaKey}`,
             type: 'debrid' as const,
             addon: vpsAddon,
+            url: placeholderUrl,
             service: { id: 'vps' as const, cached: false },
             filename,
             folderName: `[VPS CACHE]`,
