@@ -1257,6 +1257,7 @@ async function lookupVpsCacheStreams(
             filename,
             folderName: `[VPS CACHE]`,
             originalName: filename,
+            passthrough: true as const,
           },
         ];
       }
@@ -1309,6 +1310,7 @@ async function lookupVpsCacheStreams(
         size: cacheFile.size,
         filename: cacheFile.name,
         folderName: `[VPS CACHE]`,
+        passthrough: true as const,
       },
     ];
   } catch (error) {
