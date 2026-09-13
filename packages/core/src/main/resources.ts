@@ -1254,7 +1254,7 @@ async function lookupVpsCacheStreams(
           {
             id: `vps-downloading-${mediaKey}`,
             type: 'debrid' as const,
-            addon: vpsAddon,
+            addon: { ...vpsAddon, pinPosition: 'top' as const },
             url: placeholderUrl,
             service: { id: 'vps' as const, cached: false },
             filename,
@@ -1303,7 +1303,7 @@ async function lookupVpsCacheStreams(
       {
         id: `vps-cache-${cacheFile.id}-${mediaKey}`,
         type: 'debrid',
-        addon: vpsAddon,
+        addon: { ...vpsAddon, pinPosition: 'top' as const },
         url: cacheFile.link,
         service: {
           id: 'vps',
